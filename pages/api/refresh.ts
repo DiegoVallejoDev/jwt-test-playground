@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { JWT } from "../../src/jwt";
 import { timeStamp, minutes} from "../../src/timingUtils";
 import { config } from '../../src/sessionconfig';
+import { JWTdecode } from "../../src/JWTdecode";
 
 type Data = {
   error?: string;
@@ -25,16 +26,14 @@ export default function handler(
   console.log("Token:", token);
   console.log("RefreshToken:", refreshToken);
 
-  const [, p, sign] = token.split(".");
-  const [, rp] = refreshToken.split(".");
-  const payload = JSON.parse(Buffer.from(p, "base64").toString("utf8"));
-  const refreshPayload = JSON.parse(Buffer.from(rp, "base64").toString("utf8"));
-
+  const {  payload, signature  } = JWTdecode(token);
+  const { payload: refreshPayload } = JWTdecode(refreshToken);
+  
   const jwt = new JWT(key);
   const valid =
     jwt.verify_no_exp(token) &&
     jwt.verify(refreshToken) &&
-    refreshPayload.accessTokenSign === sign;
+    refreshPayload.accessTokenSign === signature;
   console.log("Valid:", valid);
 
   if (!valid) {
@@ -49,9 +48,9 @@ export default function handler(
     exp: timeStamp(new Date(), minutes(config.SESSION_TIMEOUT_MINUTES)),
   };
   const newToken = jwt.sign(newPayload);
-  const [,, newSign] = newToken.split(".");
+  const {signature: newSignature} = JWTdecode(newToken);
   const newRefreshToken = jwt.sign({
-    accessTokenSign: newSign,
+    accessTokenSign: newSignature,
     refresh: true,
     exp: timeStamp(new Date(), minutes(config.REFRESH_TIMEOUT_MINUTES)),
     iat: timeStamp(new Date()),

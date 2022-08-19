@@ -3,6 +3,7 @@ import { JWT } from "../../src/jwt";
 import { timeStamp, minutes } from "../../src/timingUtils";
 import { config } from '../../src/sessionconfig';
 import { Users } from "../../src/Users";
+import { JWTdecode } from "../../src/JWTdecode";
 
 type Data = {
   jwt?: string;
@@ -37,9 +38,9 @@ export default function handler(
     exp: timeStamp(new Date(), minutes(config.SESSION_TIMEOUT_MINUTES)),
   };
   const token = jwt.sign(payload);
-  const [,, sign] = token.split(".");
+  const {signature} = JWTdecode(token);
   const refreshToken = jwt.sign({
-    accessTokenSign: sign,
+    accessTokenSign: signature,
     refresh: true,
     iat: timeStamp(new Date()),
     exp: timeStamp(new Date(), minutes(config.REFRESH_TIMEOUT_MINUTES)),

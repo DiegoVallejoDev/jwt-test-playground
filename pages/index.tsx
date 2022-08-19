@@ -1,21 +1,20 @@
 import type { NextPage } from "next";
 import Head from "next/head";
-import { useEffect, useState } from "react";
-const crypto = require("crypto");
-const sha256 = (data: string) => {
-  return crypto.createHash("sha256").update(data).digest("hex");
-};
+import { useState } from "react";
+
+import { JWTdecode } from "../src/JWTdecode";
+import { Login } from "../src/components/Login";
+import { Logout } from "../src/components/Logout";
+import { RefreshSession } from "../src/components/RefreshSession";
+import { Validate } from "../src/components/Validate";
+import { JWTInfo } from "../src/components/JWTInfo";
 
 const Home: NextPage = () => {
   const [session, setSession] = useState<string>(""); //JWT token
   const [refreshToken, setRefresh] = useState<string>(""); //Refresh token
   const [showRefreshTokenInfo, setShowRefreshTokenInfo] =
     useState<boolean>(false); //Show refresh token info
-  const [header, b64payload, signature] = session
-    ? session.split(".")
-    : ["", "", ""];
-  const payload =
-    session && JSON.parse(Buffer.from(b64payload, "base64").toString("ascii"));
+  const { payload } = session ? JWTdecode(session) : { payload: "" };
 
   return (
     <div>
@@ -30,25 +29,22 @@ const Home: NextPage = () => {
         {!session && <Login setSession={setSession} setRefresh={setRefresh} />}
         {session && <Logout setSession={setSession} />}
         {session && <Validate token={session} />}
-        {session && (
-          <RefreshSession
-            token={session}
-            refreshToken={refreshToken}
-            setSession={setSession}
-            setRefresh={setRefresh}
-          />
-        )}
+
+        {session && <RefreshSession
+          token={session}
+          refreshToken={refreshToken}
+          setSession={setSession}
+          setRefresh={setRefresh}
+        />}
         {session && <JWTInfo token={session} />}
-        {session && (
-          <h2>
-            <input
-              type="checkbox"
-              onChange={() => setShowRefreshTokenInfo(!showRefreshTokenInfo)}
-            />
-            Show refresh Token info{" "}
-            {showRefreshTokenInfo ? <span>&#9650;</span> : <span>&#9660;</span>}
-          </h2>
-        )}
+        { session && <h2>
+          <input
+            type="checkbox"
+            onChange={() => setShowRefreshTokenInfo(!showRefreshTokenInfo)}
+          />
+          Show refresh Token info{" "}
+          {showRefreshTokenInfo ? <span>&#9650;</span> : <span>&#9660;</span>}
+        </h2>}
         {session && showRefreshTokenInfo && (
           <JWTInfo token={refreshToken} name={"Refresh Token"} />
         )}
@@ -63,317 +59,6 @@ const Home: NextPage = () => {
       </footer>
     </div>
   );
-};
-
-const Login = ({
-  setSession,
-  setRefresh,
-}: {
-  setSession: Function;
-  setRefresh: Function;
-}) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: { preventDefault: () => void }) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          password: sha256(password),
-        }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setPassword("");
-        setError(data.error);
-      } else {
-        setSession(data.jwt);
-        setRefresh(data.refreshToken);
-      }
-    } catch (err: any) {
-      setPassword("");
-      setError(err.message);
-    }
-    setLoading(false);
-  };
-  return (
-    <form onSubmit={handleSubmit}>
-      <label htmlFor="username">Username</label>
-      <input
-        id="username"
-        type="text"
-        value={username}
-        onChange={(e) => {
-          setError("");
-          setUsername(e.target.value);
-        }}
-      />
-      <label htmlFor="password">Password</label>
-      <input
-        id="password"
-        type="password"
-        value={password}
-        onChange={(e) => {
-          setError("");
-          setPassword(e.target.value);
-        }}
-      />
-      {error && <div style={{ color: "red", fontWeight: "bold" }}>{error}</div>}
-      <button type="submit">{loading ? "Loading..." : "Login"}</button>
-    </form>
-  );
-};
-
-const Logout = ({ setSession }: { setSession: Function }) => {
-  const handleLogout = async (e: any) => {
-    e.preventDefault();
-    setSession(null);
-  };
-  return (
-    <form onSubmit={handleLogout}>
-      <button type="submit">Logout</button>
-    </form>
-  );
-};
-
-const Validate = ({ token }: { token: string }) => {
-  const [error, setError] = useState("");
-  const [msg, setMsg] = useState("");
-  useEffect(() => {
-    //clear msg and error after 5 seconds
-    const timer = setTimeout(() => {
-      setMsg("");
-      setError("");
-    }, 5000);
-    return () => clearTimeout(timer);
-  }),
-    [msg, error];
-  const [loading, setLoading] = useState(false);
-  const handleSubmit = async (e: { preventDefault: () => void }) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await fetch("/api/validate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ petition: "validate" }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setLoading(false);
-        data.valid == "true"
-          ? setMsg("Token is valid")
-          : setError("Token is invalid");
-      }
-    } catch (err: any) {
-      setError(err.message);
-    }
-    setLoading(false);
-  };
-  return (
-    <form onSubmit={handleSubmit}>
-      {loading ? (
-        <div>Loading...</div>
-      ) : (
-        <button type="submit" disabled={loading || msg != "" || error != ""}>
-          {loading ? "Loading" : "Validate"}
-        </button>
-      )}
-      {msg && <span style={{ color: "blue", fontWeight: "bold" }}>{msg}</span>}
-      {error && (
-        <span style={{ color: "red", fontWeight: "bold" }}>{error}</span>
-      )}
-    </form>
-  );
-};
-
-const RefreshSession = ({
-  token,
-  refreshToken,
-  setSession,
-  setRefresh,
-}: {
-  token: string;
-  refreshToken: string;
-  setSession: Function;
-  setRefresh: Function;
-}) => {
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const handleSubmit = async (e: { preventDefault: () => void }) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await fetch("/api/refresh", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ refreshToken }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setSession(null);
-        setRefresh(data.refreshToken);
-        setSession(data.jwt);
-      }
-    } catch (err: any) {
-      setError(err.message);
-    }
-    setLoading(false);
-  };
-  return (
-    <form onSubmit={handleSubmit}>
-      {loading ? (
-        <div>Loading...</div>
-      ) : (
-        <button type="submit">Refresh Session</button>
-      )}
-      {error && <div style={{ color: "red", fontWeight: "bold" }}>{error}</div>}
-    </form>
-  );
-};
-
-const JWTInfo = ({ token, name }: { token: string; name?: string }) => {
-  const [headers, payload, signature] = token.split(".");
-  const pl = JSON.parse(Buffer.from(payload, "base64").toString("ascii"));
-  const hd = Buffer.from(headers, "base64").toString();
-
-  return (
-    <div>
-      <h2>{name ? name : "JWT Info"}</h2>
-      <hr />
-      <div>
-        <h3>Headers</h3>
-        <pre>
-          <code>{pretifyJson(hd)}</code>
-        </pre>
-        <Table data={JSON.parse(hd)} />
-        <h3>Payload</h3>
-        <pre>
-          <code>{pretifyJson(Buffer.from(payload, "base64").toString())}</code>
-        </pre>
-        <Table data={pl} />
-        <div>
-          <h3>
-            Issued at:
-            <div>
-              {pl.iat
-                ? new Date(pl.iat * 1000).toLocaleString()
-                : "No iat field"}
-            </div>
-          </h3>
-
-          <h3>
-            Expires at:
-            {pl.exp ? (
-              <ExpirationCountdown exp={pl.exp} iat={pl.iat} />
-            ) : (
-              "No iat field"
-            )}
-          </h3>
-        </div>
-
-        <hr />
-
-        <h3>Signature</h3>
-        <div>{signature}</div>
-      </div>
-      <h3> raw token:</h3>
-      <div> {token} </div>
-      <hr />
-    </div>
-  );
-};
-
-const ExpirationCountdown = ({ exp, iat }: { exp: number; iat?: number }) => {
-  const [time, setTime] = useState<number>(exp - Math.floor(Date.now() / 1000));
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTime((t: number) => t - 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [time]);
-  // if exp changes, reset time
-  useEffect(() => {
-    setTime(exp - Math.floor(Date.now() / 1000));
-  }, [exp]);
-
-  return (
-    <div>
-      {new Date(exp * 1000).toLocaleString()}
-      <div>
-        <h3>
-          Time left:{" "}
-          {time > 0 ? (
-            <Timer seconds={time} />
-          ) : (
-            <div style={{ color: "red", fontWeight: "bold" }}>expired</div>
-          )}
-        </h3>
-        {iat && (
-          <span>
-            Token has a set livespan of <Timer seconds={exp - iat} /> minutes
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const Timer = ({ seconds }: { seconds: number }) => {
-  // return seconds in minutes and seconds
-  const minutes = Math.floor(seconds / 60);
-  const secondsLeft = seconds % 60;
-  return (
-    <span>
-      {minutes}:{secondsLeft < 10 ? ("0" + secondsLeft.toString()) : secondsLeft}
-    </span>
-  );
-};
-
-const SHOWTABLES = false;
-// not using because it looks ugly but it works
-const Table = ({ data }: { data: any }) => {
-  return !SHOWTABLES ? null : (
-    <table>
-      <thead>
-        <tr>
-          <th>Key</th>
-          <th>Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        {Object.keys(data).map((key) => (
-          <tr key={key}>
-            <td>{key}</td>
-            <td>{data[key]}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-};
-
-const pretifyJson = (json: string) => {
-  return JSON.stringify(JSON.parse(json), null, 2);
 };
 
 export default Home;
