@@ -45,13 +45,22 @@ const Home: NextPage = () => {
               type="checkbox"
               onChange={() => setShowRefreshTokenInfo(!showRefreshTokenInfo)}
             />
-            Show refresh Token info
+            Show refresh Token info{" "}
+            {showRefreshTokenInfo ? <span>&#9650;</span> : <span>&#9660;</span>}
           </h2>
         )}
         {session && showRefreshTokenInfo && (
           <JWTInfo token={refreshToken} name={"Refresh Token"} />
         )}
       </main>
+      <br />
+      <br />
+      <footer>
+        copyright &copy; {new Date().getFullYear()}{" "}
+        <a href="///www.github.com/DiegoVallejoDev" target="blank">
+          Diego Vallejo
+        </a>
+      </footer>
     </div>
   );
 };
@@ -166,7 +175,9 @@ const Validate = ({ token }: { token: string }) => {
         setError(data.error);
       } else {
         setLoading(false);
-        data.valid == "true" ? setMsg("Token is valid") : setError("Token is invalid");
+        data.valid == "true"
+          ? setMsg("Token is valid")
+          : setError("Token is invalid");
       }
     } catch (err: any) {
       setError(err.message);
@@ -248,20 +259,18 @@ const JWTInfo = ({ token, name }: { token: string; name?: string }) => {
   return (
     <div>
       <h2>{name ? name : "JWT Info"}</h2>
+      <hr />
       <div>
         <h3>Headers</h3>
         <pre>
           <code>{pretifyJson(hd)}</code>
         </pre>
         <Table data={JSON.parse(hd)} />
-        <hr />
         <h3>Payload</h3>
         <pre>
           <code>{pretifyJson(Buffer.from(payload, "base64").toString())}</code>
         </pre>
         <Table data={pl} />
-
-        <hr />
         <div>
           <h3>
             Issued at:
@@ -274,7 +283,11 @@ const JWTInfo = ({ token, name }: { token: string; name?: string }) => {
 
           <h3>
             Expires at:
-            {pl.exp ? <ExpirationCountdown exp={pl.exp} /> : "No iat field"}
+            {pl.exp ? (
+              <ExpirationCountdown exp={pl.exp} iat={pl.iat} />
+            ) : (
+              "No iat field"
+            )}
           </h3>
         </div>
 
@@ -285,11 +298,12 @@ const JWTInfo = ({ token, name }: { token: string; name?: string }) => {
       </div>
       <h3> raw token:</h3>
       <div> {token} </div>
+      <hr />
     </div>
   );
 };
 
-const ExpirationCountdown = ({ exp }: { exp: number }) => {
+const ExpirationCountdown = ({ exp, iat }: { exp: number; iat?: number }) => {
   const [time, setTime] = useState<number>(exp - Math.floor(Date.now() / 1000));
   useEffect(() => {
     const interval = setInterval(() => {
@@ -314,6 +328,11 @@ const ExpirationCountdown = ({ exp }: { exp: number }) => {
             <div style={{ color: "red", fontWeight: "bold" }}>expired</div>
           )}
         </h3>
+        {iat && (
+          <span>
+            Token has a set livespan of <Timer seconds={exp - iat} /> minutes
+          </span>
+        )}
       </div>
     </div>
   );
@@ -324,9 +343,9 @@ const Timer = ({ seconds }: { seconds: number }) => {
   const minutes = Math.floor(seconds / 60);
   const secondsLeft = seconds % 60;
   return (
-    <div>
-      {minutes}:{secondsLeft < 10 ? "0" + secondsLeft : secondsLeft}
-    </div>
+    <span>
+      {minutes}:{secondsLeft < 10 ? ("0" + secondsLeft.toString()) : secondsLeft}
+    </span>
   );
 };
 
