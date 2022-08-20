@@ -40,6 +40,7 @@ const Home: NextPage = () => {
         { session && <h2>
           <input
             type="checkbox"
+            checked={showRefreshTokenInfo}
             onChange={() => setShowRefreshTokenInfo(!showRefreshTokenInfo)}
           />
           Show refresh Token info{" "}
